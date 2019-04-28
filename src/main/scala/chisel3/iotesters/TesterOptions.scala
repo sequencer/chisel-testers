@@ -29,12 +29,16 @@ case class TesterOptions(
   moreIvlFlags:         Seq[String] = Seq.empty,
   moreIvlCFlags:        Seq[String] = Seq.empty,
   ivlCommandEdits:      String = "",
+  moreNcsimFlags:       Seq[String] = Seq.empty,
+  moreNcsimCFlags:      Seq[String] = Seq.empty,
+  ncsimCommandEdits:    String = "",
   generateVcdOutput:    String = ""
 ) extends ComposableOptions
 
 object TesterOptions {
   val VcsFileCommands: Regex = """file:(.+)""".r
   val IvlFileCommands: Regex = """file:(.+)""".r
+  val NcsimFileCommands: Regex = """file:(.+)""".r
 }
 
 trait HasTesterOptions {
@@ -44,10 +48,10 @@ trait HasTesterOptions {
 
   parser.note("tester options")
 
-  parser.opt[String]("backend-name").valueName("<firrtl|treadle|verilator|ivl|vcs>")
+  parser.opt[String]("backend-name").valueName("<firrtl|treadle|verilator|ivl|vcs|ncsim>")
     .abbr("tbn")
     .validate { x =>
-      if (Array("firrtl", "treadle", "verilator", "ivl", "vcs").contains(x.toLowerCase)) parser.success
+      if (Array("firrtl", "treadle", "verilator", "ivl", "vcs", "ncsim").contains(x.toLowerCase)) parser.success
       else parser.failure(s"$x not a legal backend name")
     }
     .foreach { x => testerOptions = testerOptions.copy(backendName = x) }
@@ -114,6 +118,23 @@ trait HasTesterOptions {
     .foreach { x =>
       testerOptions = testerOptions.copy(ivlCommandEdits = x) }
     .text("a file containing regex substitutions, one per line s/pattern/replacement/")
+
+  parser.opt[String]("more-ncsim-flags")
+    .abbr("tmnf")
+    .foreach { x => testerOptions = testerOptions.copy(moreNcsimFlags = x.split("""\s""")) }
+    .text("Add specified commands to the ncsim command line")
+
+  parser.opt[String]("more-ncsim-c-flags")
+    .abbr("tmncf")
+    .foreach { x => testerOptions = testerOptions.copy(moreNcsimCFlags = x.split("""\s""")) }
+    .text("Add specified commands to the CFLAGS on the ncsim command line")
+
+  parser.opt[String]("ncsim-command-edits")
+    .abbr("tnce")
+    .foreach { x =>
+      testerOptions = testerOptions.copy(ncsimCommandEdits = x) }
+    .text("a file containing regex substitutions, one per line s/pattern/replacement/")
+
 
   parser.opt[String]("log-file-name")
     .abbr("tlfn")

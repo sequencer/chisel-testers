@@ -58,6 +58,8 @@ object Driver {
             setupIVLBackend(dutGenerator, optionsManager)
           case "vcs" =>
             setupVCSBackend(dutGenerator, optionsManager)
+          case "ncsim" =>
+            setupNcsimBackend(dutGenerator, optionsManager)
           case _ =>
             throw new Exception(s"Unrecognized backend name ${testerOptions.backendName}")
         }
@@ -72,6 +74,7 @@ object Driver {
                 case b: IVLBackend => TesterProcess.kill(b)
                 case b: VCSBackend => TesterProcess.kill(b)
                 case b: VerilatorBackend => TesterProcess.kill(b)
+                case b: NcsimBackend => TesterProcess.kill(b)
                 case _ =>
               }
               throw e
@@ -215,6 +218,7 @@ object Driver {
     *                    "verilator" will use the verilator c++ simulation generator
     *                    "ivl" will use the Icarus Verilog simulation
     *                    "vcs" will use the VCS simulation
+    *                    "ncsim" will use the ncsim simulation
     * @param verbose     Setting this to true will make the tester display information on peeks,
     *                    pokes, steps, and expects.  By default only failed expects will be printed
     * @param testerSeed  Set the random number generator seed
@@ -254,6 +258,8 @@ object Driver {
           case Some(b: VCSBackend) =>
             TesterProcess kill b
           case Some(b: VerilatorBackend) =>
+            TesterProcess kill b
+          case Some(b: NcsimBackend) =>
             TesterProcess kill b
           case _ =>
         }

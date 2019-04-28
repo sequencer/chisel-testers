@@ -31,6 +31,7 @@ object chiselMain {
     case "--firrtl" :: tail => context.backendType = "firrtl" ; parseArgs(tail)
     case "--verilator" :: tail => context.backendType = "verilator" ; parseArgs(tail)
     case "--vcs" :: tail => context.backendType = "vcs" ; parseArgs(tail)
+    case "--ncsim" :: tail => context.backendType = "ncsim" ; parseArgs(tail)
     case "--glsim" :: tail => context.backendType = "glsim" ; parseArgs(tail)
     case "--v" :: tail  => context.isGenVerilog = true ; parseArgs(tail)
     case "--backend" :: value :: tail => context.backendType = value ; parseArgs(tail)
@@ -64,6 +65,11 @@ object chiselMain {
         val harness = new FileWriter(new File(dir, s"${chirrtl.main}-harness.v"))
         val waveform = new File(dir, s"${chirrtl.main}.vpd").toString
         genVCSVerilogHarness(dut, harness, waveform.toString, context.backendType == "glsim")
+      case "ncsim" =>
+        val harness = new FileWriter(new File(dir, s"${chirrtl.main}-harness.v"))
+        // TODO: wave enable
+        val waveform = new File(dir, s"${chirrtl.main}.wave").toString
+        genNcsimVerilogHarness(dut, harness, waveform.toString, context.backendType == "glsim")
       case b => throw BackendException(b)
     }
   }
@@ -88,6 +94,11 @@ object chiselMain {
         copyVpiFiles(context.targetDir.toString)
         // Compile VCS
         assert(verilogToVCS(dutName, dir, new File(s"$dutName-harness.v")).! == 0)
+      case "ncsim" =>
+        // Copy API files
+        copyNcsimHeaderFiles(context.targetDir.toString)
+        // Compile ncsim
+        assert(verilogToNcsim(dutName, dir, new File(s"$dutName-harness.v")).! == 0)
       case b => throw BackendException(b)
     }
   }
@@ -142,7 +153,7 @@ object chiselMain {
         case "firrtl" => // skip
         case "verilator" =>
           context.testCmd += new File(context.targetDir, s"V$name").toString
-        case "vcs" | "glsim" =>
+        case "vcs" | "glsim" | "ncsim" =>
           context.testCmd += new File(context.targetDir, name).toString
         case b => throw BackendException(b)
       }
@@ -162,6 +173,8 @@ object chiselMain {
         new VerilatorBackend(dut, context.testCmd.toList, context.testerSeed)
       case "vcs" | "glsim" =>
         new VCSBackend(dut, context.testCmd.toList, context.testerSeed)
+      case "ncsim" =>
+        new NcsimBackend(dut, context.testCmd.toList, context.testerSeed)
       case b => throw BackendException(b)
     })
   }
@@ -187,6 +200,8 @@ object chiselMain {
             case Some(b: VCSBackend) =>
               TesterProcess kill b
             case Some(b: VerilatorBackend) =>
+              TesterProcess kill b
+            case Some(b: NcsimBackend) =>
               TesterProcess kill b
             case _ =>
           }

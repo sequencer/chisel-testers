@@ -308,6 +308,74 @@ private[iotesters] object verilogToVCS extends EditableBuildCSimulatorCommand {
   }
 }
 
+private[iotesters] object verilogToNcsim extends EditableBuildCSimulatorCommand {
+  val prefix = "ncsim-command-edit"
+  override def composeCommand(
+                               topModule: String,
+                               dir: java.io.File,
+                               flags: Seq[String],
+                               cFlags: Seq[String]): String = {
+    Seq("cd", dir.toString, "&&", "ncsim") ++ flags mkString " "
+
+  }
+
+
+  def composeFlags(
+                    topModule: String,
+                    dir: java.io.File,
+                    moreNcsimFlags: Seq[String] = Seq.empty[String],
+                    moreNcsimCFlags: Seq[String] = Seq.empty[String]): (Seq[String], Seq[String]) = {
+
+    val ccFlags = Seq("-I$NCSIM_HOME/include", "-I$dir", "-fPIC", "-std=c++11") ++ moreNcsimCFlags
+
+    val ncsimFlags = Seq("-full64",
+      "-quiet",
+      "-timescale=1ns/1ps",
+      "-debug_pp",
+      s"-Mdir=$topModule.csrc",
+      "+v2k", "+vpi",
+      "+ncsim+lic+wait",
+      "+ncsim+initreg+random",
+      "+define+CLOCK_PERIOD=1",
+      "-P", "vpi.tab",
+      "-cpp", "g++", "-O2", "-LDFLAGS", "-lstdc++",
+      "-CFLAGS", "\"%s\"".format(ccFlags mkString " ")) ++
+      moreNcsimFlags
+
+    (ncsimFlags, ccFlags)
+  }
+
+  def constructCSimulatorCommand(
+                                  topModule: String,
+                                  dir: java.io.File,
+                                  harness:  java.io.File,
+                                  iFlags: Seq[String] = Seq.empty[String],
+                                  iCFlags: Seq[String] = Seq.empty[String]
+                                ): String = {
+
+    val (cFlags, cCFlags) = composeFlags(topModule, dir,
+      iFlags ++ blackBoxVerilogList(dir) ++ Seq("-o", topModule, s"$topModule.v", harness.toString, "vpi.cpp"),
+      iCFlags
+    )
+
+    composeCommand(topModule, dir, cFlags, cCFlags)
+  }
+
+  def apply(
+             topModule: String,
+             dir: java.io.File,
+             ncsimHarness: java.io.File,
+             moreNcsimFlags: Seq[String] = Seq.empty[String],
+             moreNcsimCFlags: Seq[String] = Seq.empty[String],
+             editCommands: String = ""): ProcessBuilder = {
+
+    val finalCommand = editCSimulatorCommand(constructCSimulatorCommand(topModule, dir, ncsimHarness, moreNcsimFlags, moreNcsimCFlags), editCommands)
+    println(s"$finalCommand")
+
+    Seq("bash", "-c", finalCommand)
+  }
+}
+
 private[iotesters] object verilogToVerilator extends EditableBuildCSimulatorCommand {
   val prefix = "verilator-command-edit"
   override def composeCommand(
@@ -380,7 +448,7 @@ private[iotesters] object verilogToVerilator extends EditableBuildCSimulatorComm
 }
 
 private[iotesters] case class BackendException(b: String)
-  extends Exception(s"Unknown backend: $b. Backend should be firrtl, verilator, ivl, vcs, or glsim")
+  extends Exception(s"Unknown backend: $b. Backend should be firrtl, verilator, ivl, vcs, ncsim, or glsim")
 
 private[iotesters] case class TestApplicationException(exitVal: Int, lastMessage: String)
   extends RuntimeException(lastMessage)
@@ -403,6 +471,9 @@ private[iotesters] object TesterProcess {
     kill(p.simApiInterface)
   }
   def kill(p: VerilatorBackend) {
+    kill(p.simApiInterface)
+  }
+  def kill(p: NcsimBackend) {
     kill(p.simApiInterface)
   }
   def kill(p: FirrtlTerpBackend) {
